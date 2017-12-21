@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">DemoGitHub</string>
+    <string name="api_message">Message:\u0020</string>
+    <string name="api_error">Error:\u0020</string>
+</resources>
