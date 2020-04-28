@@ -3,7 +3,7 @@
 <b>ClientApp</b> - sample app for github api.
 
 - Used in this sample:
-    * [Retrofit2](https://github.com/square/retrofit) for requests
-    * [OrmLite](https://github.com/j256/ormlite-android) for storage
-    * [Glide](https://github.com/bumptech/glide) for bitmaps
+    * Requests - [retrofit2](https://github.com/square/retrofit)
+    * Storage - [ormLite](https://github.com/j256/ormlite-android)
+    * Bitmaps - [glide](https://github.com/bumptech/glide)
     
