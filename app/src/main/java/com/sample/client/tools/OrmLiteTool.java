@@ -1,51 +1,72 @@
-package com.github.demo.orm;
+package com.sample.client.tools;
 
 
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
 import android.util.Log;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import com.j256.ormlite.android.apptools.OrmLiteSqliteOpenHelper;
 import com.j256.ormlite.dao.Dao;
 import com.j256.ormlite.dao.RuntimeExceptionDao;
 import com.j256.ormlite.support.ConnectionSource;
 import com.j256.ormlite.table.TableUtils;
-import com.github.demo.data.User;
-import com.github.demo.App;
+import com.sample.client.App;
+import com.sample.client.data.User;
 
 import java.sql.SQLException;
 import java.util.List;
 
-public class DatabaseHelper extends OrmLiteSqliteOpenHelper {
+public class OrmLiteTool extends OrmLiteSqliteOpenHelper {
 
+    public static final String TAG = OrmLiteTool.class.getSimpleName();
+    
     private static final String DATABASE_NAME = "GithubTest";
     private static final int DATABASE_VERSION = 1;
+
+    private static volatile OrmLiteTool sOrmLiteTool;
+
+    public static OrmLiteTool getInstance(Context context) {
+        if (sOrmLiteTool == null) {
+            synchronized (RetrofitTool.class) {
+                if (sOrmLiteTool == null) {
+                    sOrmLiteTool = new OrmLiteTool(context);
+                }
+            }
+        }
+        return sOrmLiteTool;
+    }
+
+    public static OrmLiteTool getInstance() {
+        return getInstance(App.getApp());
+    }
+
     private RuntimeExceptionDao<User, Integer> mUserRuntimeExceptionDao = null;
     private Dao<User, Integer> mUserDao = null;
 
-    public DatabaseHelper(Context context){
+    public OrmLiteTool(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
     }
 
     @Override
-    public void onCreate(SQLiteDatabase db, ConnectionSource connectionSource){
+    public void onCreate(SQLiteDatabase db, ConnectionSource connectionSource) {
         try {
             TableUtils.createTable(connectionSource, User.class);
-        } catch (SQLException e){
-            Log.d(App.TAG, "Error creating DB: " + DATABASE_NAME);
+        } catch (SQLException e) {
+            Log.d(TAG, "Error creating DB: " + DATABASE_NAME);
             throw new RuntimeException(e);
         }
     }
 
     @Override
-    public void onUpgrade(SQLiteDatabase db, ConnectionSource connectionSource, int oldVer, int newVer){
+    public void onUpgrade(SQLiteDatabase db, ConnectionSource connectionSource, int oldVer, int newVer) {
         try {
             TableUtils.dropTable(connectionSource, User.class, true);
             onCreate(db, connectionSource);
-        } catch (SQLException e){
-            Log.e(App.TAG, "Error upgrading DB: " + DATABASE_NAME + " from ver. " + oldVer);
+        } catch (SQLException e) {
+            Log.e(TAG, "Error upgrading DB: " + DATABASE_NAME + " from ver. " + oldVer);
             throw new RuntimeException(e);
         }
     }
@@ -67,34 +88,32 @@ public class DatabaseHelper extends OrmLiteSqliteOpenHelper {
     }
 
     @Override
-    public void close(){
+    public void close() {
         super.close();
         mUserDao = null;
         mUserRuntimeExceptionDao = null;
     }
 
-    public void saveData(@NonNull List<User> data){
-        if(data != null){
+    synchronized public void saveData(@NonNull List<User> data) {
+        if(data != null) {
             try {
-                for(User user : data) {
+                for (User user : data) {
                     getUserDao().createOrUpdate(user);
                 }
             } catch (SQLException e) {
-                Log.d(App.TAG, "Can't add data to DB");
-                throw new RuntimeException(e);
+                Log.e(TAG, "Can't add data to DB");
+                throw new RuntimeException("Can't add data to DB", e);
             }
         }
     }
 
     @Nullable
-    public List<User> loadData(){
-        List<User> userList = null;
+    synchronized public List<User> loadData() {
         try {
-            userList = getUserDao().queryForAll();
+            return getUserDao().queryForAll();
         } catch (SQLException e) {
-            Log.d(App.TAG, "Can't add data to DB");
+            Log.e(TAG, "Can't add data to DB");
+            return null;
         }
-
-        return userList;
     }
 }

@@ -1,15 +1,18 @@
-package com.github.demo.rest;
+package com.sample.client.tools;
 
 import android.util.Log;
 
-import com.github.demo.orm.HelperFactory;
+import androidx.annotation.Nullable;
+
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.github.demo.data.User;
+import com.sample.client.api.Api;
+import com.sample.client.data.User;
 
 import java.lang.ref.WeakReference;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
 import okhttp3.OkHttpClient;
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -20,6 +23,19 @@ import retrofit2.converter.gson.GsonConverterFactory;
 public class RetrofitTool {
 
     public static final String TAG = Retrofit.class.getSimpleName();
+
+    private static volatile RetrofitTool sRetrofitTool;
+
+    public static RetrofitTool getInstance() {
+        if (sRetrofitTool == null) {
+            synchronized (RetrofitTool.class) {
+                if (sRetrofitTool == null) {
+                    sRetrofitTool = new RetrofitTool(Api.MAIN_URL);
+                }
+            }
+        }
+        return sRetrofitTool;
+    }
 
     public interface Callbacks {
         int ERROR_FATAL = -1;
@@ -35,44 +51,50 @@ public class RetrofitTool {
     private final Gson mGson;
     private final String mUrl;
     private final Api mApi;
-    private final Callback mCallback;
-    private boolean isRequesting;
 
-    private WeakReference<Callbacks> mWeakReference = null;
+    private WeakReference<Callbacks> mWeakReference;
 
-    public RetrofitTool(String url){
+    public RetrofitTool(String url) {
         mUrl = url;
-        isRequesting = false;
 
         mGson = new GsonBuilder()
+                .excludeFieldsWithoutExposeAnnotation()
                 .setLenient()
+                .setPrettyPrinting()
                 .create();
+
         mOkHttpClient = new OkHttpClient.Builder()
                 .readTimeout(READ_TIMEOUT, TimeUnit.MINUTES)
                 .connectTimeout(CONNECTION_TIMEOUT, TimeUnit.MINUTES)
                 .build();
+
         mRetrofit = new Retrofit.Builder()
                 .baseUrl(mUrl)
                 .client(mOkHttpClient)
                 .addConverterFactory(GsonConverterFactory.create(mGson))
                 .build();
+
         mApi = mRetrofit.create(Api.class);
-        mCallback = createCallback();
     }
 
-    private Callback createCallback(){
-        Callback callback = new Callback<List<User>>() {
+    private Callback getCallback() {
+        return new Callback<List<User>>() {
 
             @Override
             public void onResponse(Call<List<User>> call, Response<List<User>> response) {
                 Log.d(TAG, " - onResponse()");
-                isRequesting = false;
                 if (response.code() >= 200 && response.code() < 300) {
+
                     // Add new to common list
                     final List<User> userList = response.body();
                     if(userList != null) {
+
                         // For data restore
-                        HelperFactory.getHelper().saveData(userList);
+                        AsyncTool.run(() -> {
+                            OrmLiteTool.getInstance().saveData(userList);
+                            return null;
+                        });
+
                         // For views update
                         final Callbacks callbacks = mWeakReference.get();
                         if (callbacks != null) {
@@ -87,14 +109,9 @@ public class RetrofitTool {
             @Override
             public void onFailure(Call<List<User>> call, Throwable t) {
                 Log.d(TAG, " - onFailure()");
-                isRequesting = false;
-
-                // For views update
                 errorCall(t.getMessage(), Callbacks.ERROR_FATAL);
             }
         };
-
-        return callback;
     }
 
     private void errorCall(final String error, final int code) {
@@ -104,30 +121,29 @@ public class RetrofitTool {
         }
     }
 
-    public void getUsers(){
-        isRequesting = true;
-        mApi.requestUsers().enqueue(mCallback);
+    public void getUsers() {
+        mApi.requestUsers().enqueue(getCallback());
     }
 
-    public void getUsersById(int id){
-        isRequesting = true;
-        mApi.requestUsersById(id).enqueue(mCallback);
+    public void getUsersById(String id) {
+        mApi.requestUsersById(id).enqueue(getCallback());
     }
 
-    public Api getApi() {
-        return mApi;
-    }
-
-    public Callback getCallback() {
-        return mCallback;
-    }
-
-    public void setCallback(final Callbacks callback) {
+    public void setCallback(@Nullable final Callbacks callback) {
         mWeakReference = new WeakReference<>(callback);
     }
 
+    public void removeCallback() {
+        mWeakReference = null;
+    }
+
+    public void cancel() {
+        mOkHttpClient.dispatcher().cancelAll();
+    }
+
     public boolean isRequesting() {
-        return isRequesting;
+        return mOkHttpClient.dispatcher().queuedCallsCount() > 0 ||
+                mOkHttpClient.dispatcher().runningCallsCount() > 0;
     }
 
 }

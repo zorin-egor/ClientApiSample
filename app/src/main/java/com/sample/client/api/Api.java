@@ -1,8 +1,10 @@
-package com.github.demo.rest;
+package com.sample.client.api;
 
 
-import com.github.demo.data.User;
+import com.sample.client.data.User;
+
 import java.util.List;
+
 import retrofit2.Call;
 import retrofit2.http.GET;
 import retrofit2.http.Query;
@@ -15,6 +17,6 @@ public interface Api {
     Call<List<User>> requestUsers();
 
     @GET("/users")
-    Call<List<User>> requestUsersById(@Query("since") int id);
+    Call<List<User>> requestUsersById(@Query("since") String id);
 
 }
