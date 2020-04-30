@@ -6,4 +6,3 @@
     * Requests - [retrofit2](https://github.com/square/retrofit)
     * Storage - [ormLite](https://github.com/j256/ormlite-android)
     * Bitmaps - [glide](https://github.com/bumptech/glide)
-    
