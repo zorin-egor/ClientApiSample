@@ -22,9 +22,10 @@ import java.util.List;
 
 public class UsersAdapter extends RecyclerView.Adapter<UsersAdapter.ViewHolder> {
 
-    private List<User> mUserList;
+    private List<User> mUsersList;
 
     @Override
+    @NonNull
     public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         final View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_user, parent, false);
         return new ViewHolder(view);
@@ -32,7 +33,7 @@ public class UsersAdapter extends RecyclerView.Adapter<UsersAdapter.ViewHolder> 
 
     @Override
     public void onBindViewHolder(ViewHolder holder, int position) {
-        final User user = mUserList.get(position);
+        final User user = mUsersList.get(position);
         if (user != null) {
             Glide.with(holder.mAvatar)
                     .load(user.getAvatarUrl())
@@ -41,7 +42,6 @@ public class UsersAdapter extends RecyclerView.Adapter<UsersAdapter.ViewHolder> 
                     .apply(RequestOptions.bitmapTransform(new RoundedCorners(
                             holder.mAvatar.getContext().getResources().getDimensionPixelSize(R.dimen.corners_radius))))
                     .into(holder.mAvatar);
-
             holder.mLogin.setText(user.getLogin() + ": ");
             holder.mId.setText(user.getId());
         }
@@ -49,34 +49,28 @@ public class UsersAdapter extends RecyclerView.Adapter<UsersAdapter.ViewHolder> 
 
     @Override
     public int getItemCount() {
-        return mUserList != null? mUserList.size() : 0;
-    }
-
-    @Nullable
-    public List<User> getUsers() {
-        return mUserList;
+        return mUsersList != null? mUsersList.size() : 0;
     }
 
     @Nullable
     public User getLast() {
-        return mUserList != null? mUserList.get(mUserList.size() - 1) : null;
+        return mUsersList != null? mUsersList.get(mUsersList.size() - 1) : null;
     }
 
-    public void setUserList(@NonNull final List<User> userList) {
-        mUserList = userList;
+    public void setUsers(@NonNull final List<User> userList) {
+        mUsersList = userList;
         notifyDataSetChanged();
     }
 
-    public void addUserList(@NonNull final List<User> userList) {
-        if (mUserList == null) {
-            mUserList = new ArrayList<>();
+    public void addUsers(@NonNull final List<User> userList) {
+        if (mUsersList == null) {
+            mUsersList = new ArrayList<>();
         }
-
-        mUserList.addAll(userList);
-        notifyItemRangeChanged(mUserList.size(), userList.size());
+        mUsersList.addAll(userList);
+        notifyItemRangeChanged(mUsersList.size(), userList.size());
     }
 
-    protected class ViewHolder extends RecyclerView.ViewHolder {
+    protected static class ViewHolder extends RecyclerView.ViewHolder {
 
         ImageView mAvatar;
         TextView mLogin;
@@ -89,5 +83,4 @@ public class UsersAdapter extends RecyclerView.Adapter<UsersAdapter.ViewHolder> 
             mId = itemView.findViewById(R.id.github_id);
         }
     }
-
 }

@@ -1,12 +1,20 @@
 package com.sample.client.tools;
 
-import android.os.AsyncTask;
+import android.os.Handler;
+import android.os.Looper;
 
-public class AsyncTool<R> {
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
+public class AsyncTool<Result> {
 
     @FunctionalInterface
     public interface OnBackground<T> {
-        T run() throws InterruptedException;
+        @Nullable T run() throws InterruptedException;
     }
 
     @FunctionalInterface
@@ -14,71 +22,62 @@ public class AsyncTool<R> {
         void run(T t);
     }
 
-    public static <R> AsyncTool run(OnBackground<R> onBackground) {
+    public static <Result> AsyncTool run(@NonNull OnBackground<Result> onBackground) {
         return new AsyncTool(onBackground).run();
     }
 
-    public static <R> AsyncTool run(OnBackground<R> onBackground, OnResult<R> onResult) {
+    public static <Result> AsyncTool run(@NonNull OnBackground<Result> onBackground, @NonNull OnResult<Result> onResult) {
         return new AsyncTool(onBackground, onResult).run();
     }
 
-    private OnBackground<R> mOnBackground;
-    private OnResult<R> mOnResult;
-    private AsyncTask<Void, Void, R> mTask;
+    private final ExecutorService mExecutorService;
+    private final OnBackground<Result> mOnBackground;
+    private final OnResult<Result> mOnResult;
+    private final Handler mResultHandler;
+    private Future<?> mFuture;
 
-    private AsyncTool() {}
-
-    private AsyncTool(OnBackground<R> onBackground) {
+    private AsyncTool(OnBackground<Result> onBackground) {
         this(onBackground, null);
     }
 
-    private AsyncTool(OnBackground<R> onBackground, OnResult<R> onResult) {
+    private AsyncTool(OnBackground<Result> onBackground, OnResult<Result> onResult) {
+        mExecutorService = Executors.newCachedThreadPool();
+        mResultHandler = new Handler(Looper.getMainLooper());
         mOnBackground = onBackground;
         mOnResult = onResult;
     }
 
     private AsyncTool run() {
-        mTask = new AsyncTask<Void, Void, R>() {
-            @Override
-            protected R doInBackground(Void... voids) {
-                try {
-                    return mOnBackground.run();
-                } catch (Exception e) {
-                    return null;
-                }
+        mFuture = mExecutorService.submit(() -> {
+            try {
+                final Result result = mOnBackground.run();
+                mResultHandler.post(() -> {
+                    final OnResult<Result> onResult = mOnResult;
+                    if (onResult != null) {
+                        onResult.run(result);
+                    }
+                });
+            } catch (Exception e) {
+                // No need handle
             }
-
-            @Override
-            protected void onPostExecute(R result) {
-                super.onPostExecute(result);
-                try {
-                    mOnResult.run(result);
-                } catch (Exception e) {
-                    // Stub
-                }
-            }
-        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-
+        });
         return this;
     }
 
-    public void setResultCallback(OnResult<R> onResult) {
-        mOnResult = onResult;
-        if (mTask.getStatus() == AsyncTask.Status.FINISHED) {
-            try {
-                mOnResult.run(mTask.get());
-            } catch (Exception e) {
-                // Stub
-            }
+    public boolean isFinished() {
+        return mFuture == null || mFuture.isDone();
+    }
+
+    public void cancel() {
+        final Handler handler = mResultHandler;
+        if (handler != null) {
+            handler.removeCallbacksAndMessages(null);
         }
-    }
 
-    public void removeResultCallback() {
-        mOnResult = null;
-    }
-
-    public boolean cancel() {
-        return mTask != null && mTask.cancel(true);
+        final Future<?> future = mFuture;
+        if (future != null) {
+            future.cancel(true);
+        }
     }
 
 }

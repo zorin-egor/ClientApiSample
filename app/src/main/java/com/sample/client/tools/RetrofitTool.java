@@ -2,6 +2,7 @@ package com.sample.client.tools;
 
 import android.util.Log;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.google.gson.Gson;
@@ -37,87 +38,79 @@ public class RetrofitTool {
         return sRetrofitTool;
     }
 
-    public interface Callbacks {
-        int ERROR_FATAL = -1;
-        void onSuccess(final List<User> userList);
-        void onError(final String error, final int code);
+    public interface OnRequestListener {
+        void onSuccess(@NonNull final List<User> userList);
+        void onError(@Nullable final String error);
     }
 
     private static final int READ_TIMEOUT = 5;
     private static final int CONNECTION_TIMEOUT = 5;
 
     private final OkHttpClient mOkHttpClient;
-    private final Retrofit mRetrofit;
-    private final Gson mGson;
-    private final String mUrl;
     private final Api mApi;
 
-    private WeakReference<Callbacks> mWeakReference;
+    private WeakReference<OnRequestListener> mWeakReference;
 
-    public RetrofitTool(String url) {
-        mUrl = url;
-
-        mGson = new GsonBuilder()
-                .excludeFieldsWithoutExposeAnnotation()
-                .setLenient()
-                .setPrettyPrinting()
-                .create();
-
+    private RetrofitTool(String url) {
         mOkHttpClient = new OkHttpClient.Builder()
                 .readTimeout(READ_TIMEOUT, TimeUnit.MINUTES)
                 .connectTimeout(CONNECTION_TIMEOUT, TimeUnit.MINUTES)
                 .build();
 
-        mRetrofit = new Retrofit.Builder()
-                .baseUrl(mUrl)
+        Gson gson = new GsonBuilder()
+                .excludeFieldsWithoutExposeAnnotation()
+                .setLenient()
+                .setPrettyPrinting()
+                .create();
+
+        Retrofit mRetrofit = new Retrofit.Builder()
+                .baseUrl(url)
                 .client(mOkHttpClient)
-                .addConverterFactory(GsonConverterFactory.create(mGson))
+                .addConverterFactory(GsonConverterFactory.create(gson))
                 .build();
 
         mApi = mRetrofit.create(Api.class);
     }
 
-    private Callback getCallback() {
+    @NonNull
+    private Callback<List<User>> getCallback() {
         return new Callback<List<User>>() {
 
             @Override
             public void onResponse(Call<List<User>> call, Response<List<User>> response) {
                 Log.d(TAG, " - onResponse()");
-                if (response.code() >= 200 && response.code() < 300) {
 
-                    // Add new to common list
+                if (response.isSuccessful()) {
                     final List<User> userList = response.body();
-                    if(userList != null) {
-
-                        // For data restore
-                        AsyncTool.run(() -> {
-                            OrmLiteTool.getInstance().saveData(userList);
-                            return null;
-                        });
-
-                        // For views update
-                        final Callbacks callbacks = mWeakReference.get();
-                        if (callbacks != null) {
-                            callbacks.onSuccess(userList);
+                    if (userList != null) {
+                        final WeakReference<OnRequestListener> weakReference = mWeakReference;
+                        if (weakReference != null) {
+                            final OnRequestListener listener = weakReference.get();
+                            if (listener != null) {
+                                listener.onSuccess(userList);
+                            }
                         }
                     }
                 } else {
-                    errorCall(response.message(), response.code());
+                    onError(response.message());
                 }
             }
 
             @Override
             public void onFailure(Call<List<User>> call, Throwable t) {
                 Log.d(TAG, " - onFailure()");
-                errorCall(t.getMessage(), Callbacks.ERROR_FATAL);
+                onError(t.getMessage());
             }
         };
     }
 
-    private void errorCall(final String error, final int code) {
-        final Callbacks callbacks = mWeakReference.get();
-        if (callbacks != null) {
-            callbacks.onError(error, code);
+    private void onError(final String error) {
+        final WeakReference<OnRequestListener> reference = mWeakReference;
+        if (reference != null) {
+            final OnRequestListener listener = reference.get();
+            if (listener != null) {
+                listener.onError(error);
+            }
         }
     }
 
@@ -129,11 +122,11 @@ public class RetrofitTool {
         mApi.requestUsersById(id).enqueue(getCallback());
     }
 
-    public void setCallback(@Nullable final Callbacks callback) {
-        mWeakReference = new WeakReference<>(callback);
+    public void setListener(@Nullable final OnRequestListener listener) {
+        mWeakReference = new WeakReference<>(listener);
     }
 
-    public void removeCallback() {
+    public void removeListener() {
         mWeakReference = null;
     }
 

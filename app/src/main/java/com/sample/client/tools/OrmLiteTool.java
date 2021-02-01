@@ -13,7 +13,6 @@ import com.j256.ormlite.dao.Dao;
 import com.j256.ormlite.dao.RuntimeExceptionDao;
 import com.j256.ormlite.support.ConnectionSource;
 import com.j256.ormlite.table.TableUtils;
-import com.sample.client.App;
 import com.sample.client.data.User;
 
 import java.sql.SQLException;
@@ -40,13 +39,16 @@ public class OrmLiteTool extends OrmLiteSqliteOpenHelper {
     }
 
     public static OrmLiteTool getInstance() {
-        return getInstance(App.getApp());
+        if (sOrmLiteTool == null) {
+            throw new IllegalStateException(TAG + " must be init before use");
+        }
+        return sOrmLiteTool;
     }
 
     private RuntimeExceptionDao<User, Integer> mUserRuntimeExceptionDao = null;
     private Dao<User, Integer> mUserDao = null;
 
-    public OrmLiteTool(Context context) {
+    private OrmLiteTool(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
     }
 
@@ -75,7 +77,6 @@ public class OrmLiteTool extends OrmLiteSqliteOpenHelper {
         if (mUserDao == null) {
             mUserDao = getDao(User.class);
         }
-
         return mUserDao;
     }
 
@@ -83,7 +84,6 @@ public class OrmLiteTool extends OrmLiteSqliteOpenHelper {
         if (mUserRuntimeExceptionDao == null) {
             mUserRuntimeExceptionDao = getRuntimeExceptionDao(User.class);
         }
-
         return mUserRuntimeExceptionDao;
     }
 
@@ -94,10 +94,10 @@ public class OrmLiteTool extends OrmLiteSqliteOpenHelper {
         mUserRuntimeExceptionDao = null;
     }
 
-    synchronized public void saveData(@NonNull List<User> data) {
-        if(data != null) {
+    public synchronized void saveData(@NonNull List<User> items) {
+        if (items != null) {
             try {
-                for (User user : data) {
+                for (User user : items) {
                     getUserDao().createOrUpdate(user);
                 }
             } catch (SQLException e) {
@@ -108,7 +108,7 @@ public class OrmLiteTool extends OrmLiteSqliteOpenHelper {
     }
 
     @Nullable
-    synchronized public List<User> loadData() {
+    public synchronized List<User> loadData() {
         try {
             return getUserDao().queryForAll();
         } catch (SQLException e) {

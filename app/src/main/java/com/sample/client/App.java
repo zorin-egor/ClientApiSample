@@ -7,12 +7,10 @@ import com.sample.client.tools.OrmLiteTool;
 
 public class App extends Application {
 
-    private static App sApplication;
-
     @Override
     public void onCreate() {
         super.onCreate();
-        sApplication = this;
+        OrmLiteTool.getInstance(this);
     }
 
     @Override
@@ -20,9 +18,4 @@ public class App extends Application {
         super.onTerminate();
         OrmLiteTool.getInstance(this).close();
     }
-
-    public static App getApp() {
-        return sApplication;
-    }
-
 }
